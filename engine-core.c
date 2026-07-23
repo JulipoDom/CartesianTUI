@@ -7,6 +7,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define LARGURA 68
+#define ALTURA 34
+#define MAX_EQUACOES 10
+#define TAM_MAX_EQ 256
+
+char tela[ALTURA][LARGURA];
+
+void aplicarZoom(double *min, double *max, double fator) {
+  double centro = (*max + *min) / 2.0;
+  double alcance = (*max - *min) / 2.0;
+  *min = centro - (alcance * fator);
+  *max = centro + (alcance * fator);
+}
+
 // Dicionário de funções e constantes suportadas
 const char *palavras_conhecidas[] = {
     "sin", "arcsin", "sinh", "cos", "arccos", "tan",  "arctan", "tanh", "cot",
@@ -320,7 +334,9 @@ double evalRPN(char **rpnTokens, double x) {
     }
     // 2. Constantes (exemplo: pi)
     else if (strcmp(token, "pi") == 0) {
-      pushDoubleStack(&stack, M_PI); // M_PI vem de math.h
+      pushDoubleStack(&stack, M_PI);
+    } else if (strcmp(token, "e") == 0) {
+      pushDoubleStack(&stack, M_E);
     }
     // 3. Operadores Binários (+, -, *, /, ^)
     else if (strlen(token) == 1 && strchr("+-*/^", token[0]) != NULL) {
@@ -380,7 +396,6 @@ double evalRPN(char **rpnTokens, double x) {
         pushDoubleStack(&stack, 1.0 / tan(a));
       else if (strcmp(token, "sech") == 0)
         pushDoubleStack(&stack, 1.0 / cosh(a));
-
       // Logaritmos e Raiz
       else if (strcmp(token, "log") == 0)
         pushDoubleStack(&stack, log10(a));
@@ -409,40 +424,159 @@ double evalRPN(char **rpnTokens, double x) {
   return resultadoFinal;
 }
 
+double calcularY(char **tokensRPN, double valorX) {
+  double valorY = evalRPN(tokensRPN, valorX);
+  printf("X: %f, Y: %f \n", valorX, valorY);
+  return valorY;
+}
+
+void limparMatrizTela(double x_min, double x_max, double y_min, double y_max) {
+  // Descobre em qual linha e coluna o ZERO (origem) está mapeado atualmente
+  int col_zero = (int)((0.0 - x_min) / (x_max - x_min) * LARGURA);
+  int lin_zero = ALTURA - 1 - (int)((0.0 - y_min) / (y_max - y_min) * ALTURA);
+
+  for (int i = 0; i < ALTURA; i++) {
+    for (int j = 0; j < LARGURA; j++) {
+      // Desenha os eixos se estiverem na tela, senão deixa em branco
+      if (i == lin_zero && j == col_zero) {
+        tela[i][j] = '+'; // Centro
+      } else if (i == lin_zero) {
+        tela[i][j] = '-'; // Eixo X
+      } else if (j == col_zero) {
+        tela[i][j] = '|'; // Eixo Y
+      } else {
+        tela[i][j] = ' '; // Fundo vazio
+      }
+    }
+  }
+}
+
+void plotarNaMatriz(char **tokens, double x_min, double x_max, double y_min,
+                    double y_max, char marcador) {
+  double passo_x = (x_max - x_min) / LARGURA;
+
+  for (int col = 0; col < LARGURA; col++) {
+    double x = x_min + (col * passo_x);
+
+    double y = evalRPN(tokens, x);
+
+    if (!isfinite(y)) {
+      continue;
+    }
+
+    int linha = ALTURA - 1 - (int)((y - y_min) / (y_max - y_min) * ALTURA);
+
+    if (linha >= 0 && linha < ALTURA) {
+      tela[linha][col] = marcador;
+    }
+  }
+}
+
+void imprimirMatrizTela() {
+  for (int i = 0; i < ALTURA; i++) {
+    for (int j = 0; j < LARGURA; j++) {
+      putchar(tela[i][j]);
+    }
+    putchar('\n'); // Quebra a linha ao final de cada fileira da matriz
+  }
+}
+
 int main() {
-  const char *equacao = "2sinh(xpi)/log(10x)";
+  // Variáveis de visualização (mutáveis)
+  double x_min = -10.0, x_max = 10.0;
+  double y_min = -10.0, y_max = 10.0;
 
-  // 1. Gera os tokens dinamicamente
-  char **tokens = inputReader(equacao);
-  if (tokens == NULL) {
-    printf("Erro ao ler a equação.\n");
-    return EXIT_FAILURE;
+  // Histórico para sobreposição
+  char historico_eq[MAX_EQUACOES][TAM_MAX_EQ];
+  int total_eqs = 0;
+  char **tokens, **rpn_tokens;
+  char comando;
+  char buffer_eq[TAM_MAX_EQ];
+  char marcadores[5] = {'*', '#', '@', 'O', 'x'};
+  while (1) {
+    // 1. LIMPAR A TELA DO TERMINAL E A MATRIZ DE PLOTAGEM
+    system("clear"); // Use "cls" se estiver no Windows
+    limparMatrizTela(x_min, x_max, y_min, y_max);
+
+    for (int i = 0; i < total_eqs; i++) {
+      tokens = NULL;
+      if (historico_eq[i]) {
+        tokens = inputReader(historico_eq[i]);
+      }
+      if (tokens != NULL) {
+        rpn_tokens = shuntingYard(tokens);
+        char simbolo_da_vez = marcadores[i % 5];
+        plotarNaMatriz(rpn_tokens, x_min, x_max, y_min, y_max, simbolo_da_vez);
+      }
+    }
+
+    imprimirMatrizTela(); // 4. MENU DE CONTROLE
+    printf("\n--- CONTROLES ---\n");
+    printf("[n] Nova equacao (limpar atual)\n");
+    printf("[s] Nova equacao (sobrepor)\n");
+    printf("[x] Zoom In X   [X] Zoom Out X\n");
+    printf("[y] Zoom In Y   [Y] Zoom Out Y\n");
+    printf("[z] Zoom In All [Z] Zoom Out All\n");
+    printf("[r] Zoom Reset  [q] Sair\n");
+    printf("Escolha: ");
+
+    scanf(" %c",
+          &comando); // O espaço antes de %c consome quebras de linha residuais
+
+    // 5. PROCESSAR COMANDOS
+    switch (comando) {
+    case 'n': // Nova Equação (Limpa tudo)
+      total_eqs = 0;
+      printf("Digite a equacao: ");
+      scanf("%255s", buffer_eq);
+      strcpy(historico_eq[total_eqs], buffer_eq);
+      total_eqs++;
+      break;
+
+    case 's': // Sobrepor
+      if (total_eqs < MAX_EQUACOES) {
+        printf("Digite a equacao para sobrepor: ");
+        scanf("%255s", buffer_eq);
+        strcpy(historico_eq[total_eqs], buffer_eq);
+        total_eqs++;
+      } else {
+        printf("Limite de equacoes simultaneas atingido!\n");
+      }
+      break;
+
+    case 'x':
+      aplicarZoom(&x_min, &x_max, 0.5);
+      break; // Zoom In X
+    case 'X':
+      aplicarZoom(&x_min, &x_max, 2.0);
+      break; // Zoom Out X
+
+    case 'y':
+      aplicarZoom(&y_min, &y_max, 0.5);
+      break; // Zoom In Y
+    case 'Y':
+      aplicarZoom(&y_min, &y_max, 2.0);
+      break; // Zoom Out Y
+
+    case 'z': // Zoom In Ambos
+      aplicarZoom(&x_min, &x_max, 0.5);
+      aplicarZoom(&y_min, &y_max, 0.5);
+      break;
+
+    case 'Z':
+      aplicarZoom(&x_min, &x_max, 2.0);
+      aplicarZoom(&y_min, &y_max, 2.0);
+      break;
+    case 'r':
+      x_min = -10.0, x_max = 10.0;
+      y_min = -10.0, y_max = 10.0;
+      break;
+    case 'q': // Sair
+      return EXIT_SUCCESS;
+
+    default:
+      break; // Comando ignorado, o loop recomeça
+    }
   }
-
-  // 2. Apenas para testar: imprime os tokens para ver se funcionou
-  printf("Tokens gerados:\n");
-  int i = 0;
-  while (tokens[i] != NULL) {
-    printf("[%s] ", tokens[i]);
-    i++;
-  }
-  printf("\n");
-
-  char **rpn_output = shuntingYard(tokens);
-  printf("RPN gerado:\n");
-  i = 0;
-  while (rpn_output[i] != NULL) {
-    printf("[%s] ", rpn_output[i]);
-    i++;
-  }
-
-  double res = evalRPN(rpn_output, 1.0);
-
-  printf("\n%f\n", res);
-
-  liberarTokens(tokens);
-
-  liberarTokens(rpn_output);
-
-  return EXIT_SUCCESS;
+  return 0;
 }
