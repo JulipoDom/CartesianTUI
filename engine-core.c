@@ -1,31 +1,18 @@
+#include "engine-core.h"
 #include "double-stack.h"
 #include "string-stack.h"
 #include <ctype.h>
 #include <math.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define LARGURA 68
-#define ALTURA 34
-#define MAX_EQUACOES 10
-#define TAM_MAX_EQ 256
-
-char tela[ALTURA][LARGURA];
-
-void aplicarZoom(double *min, double *max, double fator) {
-  double centro = (*max + *min) / 2.0;
-  double alcance = (*max - *min) / 2.0;
-  *min = centro - (alcance * fator);
-  *max = centro + (alcance * fator);
-}
-
 // Dicionário de funções e constantes suportadas
 const char *palavras_conhecidas[] = {
-    "sin", "arcsin", "sinh", "cos", "arccos", "tan",  "arctan", "tanh", "cot",
-    "sec", "sech",   "csc",  "log", "ln",     "sqrt", "pi",     "e"};
-const int num_palavras = 17;
+    "sin",    "arcsin", "sinh",   "cos",  "arccos", "cosh",   "tan",  "arctan",
+    "tanh",   "cot",    "arccot", "coth", "sec",    "arcsec", "sech", "csc",
+    "arccsc", "csch",   "log",    "ln",   "sqrt",   "pi",     "e"};
+const int num_palavras = 22;
 
 // Verifica se o texto começa com uma palavra do dicionário.
 // Retorna o tamanho da palavra encontrada ou 0.
@@ -120,7 +107,7 @@ char **inputReader(const char *expression) {
         bool is_unary = (token_count == 0);
         if (!is_unary) {
           char *ultimo = token_array[token_count - 1];
-          if (strchr("+-*/^(~", ultimo[0]) != NULL)
+          if (strchr("+-*/^(~=", ultimo[0]) != NULL)
             is_unary = true;
         }
 
@@ -171,33 +158,30 @@ void liberarTokens(char **tokens) {
 
 // Retorna a precedência do operador (maior número = maior prioridade)
 int getPrecedencia(const char *op) {
+  if (strcmp(op, "=") == 0)
+    return 1; // '=' tem a MENOR prioridade de todas
   if (strcmp(op, "+") == 0 || strcmp(op, "-") == 0)
-    return 1;
-  if (strcmp(op, "*") == 0 || strcmp(op, "/") == 0)
     return 2;
+  if (strcmp(op, "*") == 0 || strcmp(op, "/") == 0)
+    return 3;
   if (strcmp(op, "^") == 0)
-    ;
-  return 3;
+    return 4;
   if (strcmp(op, "~") == 0)
-    return 4; // Menos unário
-
-  // Funções (sin, cos, log) têm a maior precedência
-  if (isalpha(op[0]) && strlen(op) > 1)
     return 5;
-
+  if (isalpha(op[0]) && strlen(op) > 1)
+    return 6;
   return 0;
 }
 
+bool isOperador(const char *token) {
+  // Adicionamos o '=' aqui na string
+  return strchr("+-*/^~=", token[0]) != NULL && strlen(token) == 1;
+}
 // Retorna true se o operador é associativo à direita
 bool isAssociativoDireita(const char *op) {
   if (strcmp(op, "^") == 0 || strcmp(op, "~") == 0)
     return true;
   return false;
-}
-
-// Verifica se o token é um operador matemático básico
-bool isOperador(const char *token) {
-  return strchr("+-*/^~", token[0]) != NULL && strlen(token) == 1;
 }
 
 bool isFuncao(const char *token) {
@@ -321,31 +305,31 @@ char **shuntingYard(char **tokens) {
   return saida;
 }
 
-double evalRPN(char **rpnTokens, double x) {
+double evalRPN(char **rpnTokens, double x, double y) {
   DoubleStack stack;
   initDoubleStack(&stack, 50); // Tamanho inicial razoável
   int i = 0;
   while (rpnTokens[i] != NULL) {
     char *token = rpnTokens[i];
 
-    // 1. Variável X
     if (strcmp(token, "x") == 0) {
       pushDoubleStack(&stack, x);
-    }
-    // 2. Constantes (exemplo: pi)
+    } else if (strcmp(token, "y") == 0) {
+      pushDoubleStack(&stack, y);
+    } // 2. Constantes (exemplo: pi)
     else if (strcmp(token, "pi") == 0) {
       pushDoubleStack(&stack, M_PI);
     } else if (strcmp(token, "e") == 0) {
       pushDoubleStack(&stack, M_E);
     }
     // 3. Operadores Binários (+, -, *, /, ^)
-    else if (strlen(token) == 1 && strchr("+-*/^", token[0]) != NULL) {
+    else if (strlen(token) == 1 && strchr("+-*/^=", token[0]) != NULL) {
       double b = popDoubleStack(&stack); // Lado direito
       double a = popDoubleStack(&stack); // Lado esquerdo
 
       if (token[0] == '+')
         pushDoubleStack(&stack, a + b);
-      else if (token[0] == '-')
+      else if (token[0] == '-' || token[0] == '=')
         pushDoubleStack(&stack, a - b);
       else if (token[0] == '*')
         pushDoubleStack(&stack, a * b);
@@ -355,14 +339,7 @@ double evalRPN(char **rpnTokens, double x) {
         pushDoubleStack(&stack, pow(a, b));
     }
     // 4. Funções Unárias (sin, cos, sqrt, etc)
-    else if (strcmp(token, "sin") == 0 || strcmp(token, "arcsin") == 0 ||
-             strcmp(token, "sinh") == 0 || strcmp(token, "cos") == 0 ||
-             strcmp(token, "arccos") == 0 || strcmp(token, "tan") == 0 ||
-             strcmp(token, "arctan") == 0 || strcmp(token, "tanh") == 0 ||
-             strcmp(token, "cot") == 0 || strcmp(token, "sec") == 0 ||
-             strcmp(token, "sech") == 0 || strcmp(token, "csc") == 0 ||
-             strcmp(token, "log") == 0 || strcmp(token, "ln") == 0 ||
-             strcmp(token, "sqrt") == 0 || strcmp(token, "~") == 0) {
+    else if (isFuncao(token) || strcmp(token, "~") == 0) {
       double a = popDoubleStack(&stack);
 
       // Trigonométricas básicas
@@ -384,18 +361,36 @@ double evalRPN(char **rpnTokens, double x) {
       // Trigonométricas hiperbólicas
       else if (strcmp(token, "sinh") == 0)
         pushDoubleStack(&stack, sinh(a));
+      else if (strcmp(token, "cosh") == 0)
+        pushDoubleStack(&stack, cosh(a));
       else if (strcmp(token, "tanh") == 0)
         pushDoubleStack(&stack, tanh(a));
 
-      // Trigonométricas recíprocas (não nativas, calculadas via divisão)
-      else if (strcmp(token, "sec") == 0)
-        pushDoubleStack(&stack, 1.0 / cos(a));
+      // Trigonométricas recíprocas (calculadas via divisão)
       else if (strcmp(token, "csc") == 0)
         pushDoubleStack(&stack, 1.0 / sin(a));
+      else if (strcmp(token, "sec") == 0)
+        pushDoubleStack(&stack, 1.0 / cos(a));
       else if (strcmp(token, "cot") == 0)
         pushDoubleStack(&stack, 1.0 / tan(a));
+
+      // Trigonométricas recíprocas inversas
+      else if (strcmp(token, "arccsc") == 0)
+        pushDoubleStack(&stack, asin(1.0 / a));
+      else if (strcmp(token, "arcsec") == 0)
+        pushDoubleStack(&stack, acos(1.0 / a));
+      else if (strcmp(token, "arccot") == 0)
+        pushDoubleStack(&stack,
+                        M_PI / 2.0 - atan(a)); // Identidade do arco-cotangente
+
+      // Trigonométricas recíprocas hiperbólicas
+      else if (strcmp(token, "csch") == 0)
+        pushDoubleStack(&stack, 1.0 / sinh(a));
       else if (strcmp(token, "sech") == 0)
         pushDoubleStack(&stack, 1.0 / cosh(a));
+      else if (strcmp(token, "coth") == 0)
+        pushDoubleStack(&stack, 1.0 / tanh(a));
+
       // Logaritmos e Raiz
       else if (strcmp(token, "log") == 0)
         pushDoubleStack(&stack, log10(a));
@@ -407,9 +402,7 @@ double evalRPN(char **rpnTokens, double x) {
       // Menos unário
       else if (strcmp(token, "~") == 0)
         pushDoubleStack(&stack, -a);
-    } // 5. Se não é variável, operador ou função, é um número!
-    else {
-      // Converte a string para double e empilha
+    } else {
       pushDoubleStack(&stack, atof(token));
     }
     i++;
@@ -422,161 +415,4 @@ double evalRPN(char **rpnTokens, double x) {
   freeDoubleStack(&stack);
 
   return resultadoFinal;
-}
-
-double calcularY(char **tokensRPN, double valorX) {
-  double valorY = evalRPN(tokensRPN, valorX);
-  printf("X: %f, Y: %f \n", valorX, valorY);
-  return valorY;
-}
-
-void limparMatrizTela(double x_min, double x_max, double y_min, double y_max) {
-  // Descobre em qual linha e coluna o ZERO (origem) está mapeado atualmente
-  int col_zero = (int)((0.0 - x_min) / (x_max - x_min) * LARGURA);
-  int lin_zero = ALTURA - 1 - (int)((0.0 - y_min) / (y_max - y_min) * ALTURA);
-
-  for (int i = 0; i < ALTURA; i++) {
-    for (int j = 0; j < LARGURA; j++) {
-      // Desenha os eixos se estiverem na tela, senão deixa em branco
-      if (i == lin_zero && j == col_zero) {
-        tela[i][j] = '+'; // Centro
-      } else if (i == lin_zero) {
-        tela[i][j] = '-'; // Eixo X
-      } else if (j == col_zero) {
-        tela[i][j] = '|'; // Eixo Y
-      } else {
-        tela[i][j] = ' '; // Fundo vazio
-      }
-    }
-  }
-}
-
-void plotarNaMatriz(char **tokens, double x_min, double x_max, double y_min,
-                    double y_max, char marcador) {
-  double passo_x = (x_max - x_min) / LARGURA;
-
-  for (int col = 0; col < LARGURA; col++) {
-    double x = x_min + (col * passo_x);
-
-    double y = evalRPN(tokens, x);
-
-    if (!isfinite(y)) {
-      continue;
-    }
-
-    int linha = ALTURA - 1 - (int)((y - y_min) / (y_max - y_min) * ALTURA);
-
-    if (linha >= 0 && linha < ALTURA) {
-      tela[linha][col] = marcador;
-    }
-  }
-}
-
-void imprimirMatrizTela() {
-  for (int i = 0; i < ALTURA; i++) {
-    for (int j = 0; j < LARGURA; j++) {
-      putchar(tela[i][j]);
-    }
-    putchar('\n'); // Quebra a linha ao final de cada fileira da matriz
-  }
-}
-
-int main() {
-  // Variáveis de visualização (mutáveis)
-  double x_min = -10.0, x_max = 10.0;
-  double y_min = -10.0, y_max = 10.0;
-
-  // Histórico para sobreposição
-  char historico_eq[MAX_EQUACOES][TAM_MAX_EQ];
-  int total_eqs = 0;
-  char **tokens, **rpn_tokens;
-  char comando;
-  char buffer_eq[TAM_MAX_EQ];
-  char marcadores[5] = {'*', '#', '@', 'O', 'x'};
-  while (1) {
-    // 1. LIMPAR A TELA DO TERMINAL E A MATRIZ DE PLOTAGEM
-    system("clear"); // Use "cls" se estiver no Windows
-    limparMatrizTela(x_min, x_max, y_min, y_max);
-
-    for (int i = 0; i < total_eqs; i++) {
-      tokens = NULL;
-      if (historico_eq[i]) {
-        tokens = inputReader(historico_eq[i]);
-      }
-      if (tokens != NULL) {
-        rpn_tokens = shuntingYard(tokens);
-        char simbolo_da_vez = marcadores[i % 5];
-        plotarNaMatriz(rpn_tokens, x_min, x_max, y_min, y_max, simbolo_da_vez);
-      }
-    }
-
-    imprimirMatrizTela(); // 4. MENU DE CONTROLE
-    printf("\n--- CONTROLES ---\n");
-    printf("[n] Nova equacao (limpar atual)\n");
-    printf("[s] Nova equacao (sobrepor)\n");
-    printf("[x] Zoom In X   [X] Zoom Out X\n");
-    printf("[y] Zoom In Y   [Y] Zoom Out Y\n");
-    printf("[z] Zoom In All [Z] Zoom Out All\n");
-    printf("[r] Zoom Reset  [q] Sair\n");
-    printf("Escolha: ");
-
-    scanf(" %c",
-          &comando); // O espaço antes de %c consome quebras de linha residuais
-
-    // 5. PROCESSAR COMANDOS
-    switch (comando) {
-    case 'n': // Nova Equação (Limpa tudo)
-      total_eqs = 0;
-      printf("Digite a equacao: ");
-      scanf("%255s", buffer_eq);
-      strcpy(historico_eq[total_eqs], buffer_eq);
-      total_eqs++;
-      break;
-
-    case 's': // Sobrepor
-      if (total_eqs < MAX_EQUACOES) {
-        printf("Digite a equacao para sobrepor: ");
-        scanf("%255s", buffer_eq);
-        strcpy(historico_eq[total_eqs], buffer_eq);
-        total_eqs++;
-      } else {
-        printf("Limite de equacoes simultaneas atingido!\n");
-      }
-      break;
-
-    case 'x':
-      aplicarZoom(&x_min, &x_max, 0.5);
-      break; // Zoom In X
-    case 'X':
-      aplicarZoom(&x_min, &x_max, 2.0);
-      break; // Zoom Out X
-
-    case 'y':
-      aplicarZoom(&y_min, &y_max, 0.5);
-      break; // Zoom In Y
-    case 'Y':
-      aplicarZoom(&y_min, &y_max, 2.0);
-      break; // Zoom Out Y
-
-    case 'z': // Zoom In Ambos
-      aplicarZoom(&x_min, &x_max, 0.5);
-      aplicarZoom(&y_min, &y_max, 0.5);
-      break;
-
-    case 'Z':
-      aplicarZoom(&x_min, &x_max, 2.0);
-      aplicarZoom(&y_min, &y_max, 2.0);
-      break;
-    case 'r':
-      x_min = -10.0, x_max = 10.0;
-      y_min = -10.0, y_max = 10.0;
-      break;
-    case 'q': // Sair
-      return EXIT_SUCCESS;
-
-    default:
-      break; // Comando ignorado, o loop recomeça
-    }
-  }
-  return 0;
 }
