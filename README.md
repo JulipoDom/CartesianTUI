@@ -2,7 +2,7 @@
 
 Um utilitário de plotagem de gráficos matemáticos desenhado inteiramente para o terminal. Desenvolvido em C, o **CartesianTUI** utiliza a biblioteca `ncurses` para renderizar uma interface de usuário rica, suportando múltiplas equações, movimentação suave de câmera e um motor matemático customizado.
 
-![Exemplo de plotagem de Múltiplas Funções](pictures/screenshot-2026-07-24_00-50-45.png)
+![Exemplo de plotagem de Múltiplas Funções](pictures/screenshot-2026-07-24_15-21-48.png)
 
 ## ✨ Principais Funcionalidades
 
