@@ -25,34 +25,45 @@ Um utilitário de plotagem de gráficos matemáticos desenhado inteiramente para
 
 ## 🧮 Funções Matemáticas Suportadas
 
-O interpretador do CartesianTUI suporta um vasto dicionário de constantes, operadores e funções[cite: 1, 4]:
+O interpretador do CartesianTUI suporta um vasto dicionário de constantes, operadores e funções:
 
-- **Operadores Básicos:** `+`, `-`, `*`, `/`, `^` (potência), `=` (para equações implícitas)[cite: 1].
+- **Operadores Básicos:** `+`, `-`, `*`, `/`, `^` (potência), `=` (para equações implícitas).
 - **Constantes:** `pi`, `e`[cite: 1].
-- **Trigonometria Básica:** `sin()`, `cos()`, `tan()`, `sec()`, `csc()`, `cot()`[cite: 1, 4].
-- **Trigonometria Inversa:** `arcsin()`, `arccos()`, `arctan()`, `arcsec()`, `arccsc()`, `arccot()`[cite: 1, 4].
-- **Trigonometria Hiperbólica:** `sinh()`, `cosh()`, `tanh()`, `sech()`, `csch()`, `coth()`[cite: 1, 4].
-- **Outras Funções:** `sqrt()` (Raiz quadrada), `log()` (Base 10), `ln()` (Logaritmo natural)[cite: 1, 4].
+- **Trigonometria Básica:** `sin()`, `cos()`, `tan()`, `sec()`, `csc()`, `cot()`.
+- **Trigonometria Inversa:** `arcsin()`, `arccos()`, `arctan()`, `arcsec()`, `arccsc()`, `arccot()`.
+- **Trigonometria Hiperbólica:** `sinh()`, `cosh()`, `tanh()`, `sech()`, `csch()`, `coth()`.
+- **Outras Funções:** `sqrt()` (Raiz quadrada), `log()` (Base 10), `ln()` (Logaritmo natural).
 
 ## 🎮 Controles e Navegação
 
 A interface foi pensada para ser fluida e controlada quase que inteiramente pelo teclado:
 
-- **`n`**: Inserir uma nova equação (limpa o histórico atual)[cite: 5].
-- **`s`**: Sobrepor equação (adiciona uma nova curva sem apagar as existentes)[cite: 5].
-- **`Setas`**: Movem a câmera / gráfico (Pan)[cite: 4, 5].
-- **`x` / `X`**: Zoom In / Zoom Out apenas no eixo X[cite: 5].
-- **`y` / `Y`**: Zoom In / Zoom Out apenas no eixo Y[cite: 5].
-- **`z` / `Z`**: Zoom In / Zoom Out proporcional em ambos os eixos[cite: 5].
-- **`m`**: Liga/Desliga a suavização de movimento da câmera[cite: 5].
-- **`r`**: Reseta a visualização para as proporções e posição originais[cite: 4, 5].
-- **`h`**: Abre o painel flutuante de Ajuda[cite: 4, 5].
-- **`q`** ou **`ESC`**: Fecha os menus ou sai do programa[cite: 4, 5].
-- **`Mouse`**: Posicione o ponteiro na tela para ler coordenadas exatas. Clique com o botão direito para limpar a mira[cite: 4, 5].
+- **`n`**: Inserir uma nova equação (limpa o histórico atual).
+- **`s`**: Sobrepor equação (adiciona uma nova curva sem apagar as existentes).
+- **`Setas`**: Movem a câmera / gráfico (Pan).
+- **`x` / `X`**: Zoom In / Zoom Out apenas no eixo X.
+- **`y` / `Y`**: Zoom In / Zoom Out apenas no eixo Y.
+- **`z` / `Z`**: Zoom In / Zoom Out proporcional em ambos os eixos.
+- **`m`**: Liga/Desliga a suavização de movimento da câmera.
+- **`r`**: Reseta a visualização para as proporções e posição originais.
+- **`h`**: Abre o painel flutuante de Ajuda.
+- **`q`** ou **`ESC`**: Fecha os menus ou sai do programa.
+- **`Mouse`**: Posicione o ponteiro na tela para ler coordenadas exatas. Clique com o botão direito para limpar a mira.
 
 ## 🛠️ Instalação e Compilação
 
 Para compilar este projeto, você precisará de um ambiente Unix-like (Linux, macOS, WSL) com o compilador GCC e a biblioteca `ncurses` instalada.
+
+* **Windows (via WSL):**
+  Como o projeto utiliza a biblioteca `ncurses` (focada em sistemas Unix-like), a maneira mais fácil e performática de rodá-lo no Windows é utilizando o WSL (Windows Subsystem for Linux).
+
+  **1.** Abra o seu **PowerShell** como Administrador e execute o comando abaixo para instalar o WSL e o Ubuntu padrão:
+  ```powershell
+  wsl --install
+  ```
+  **2.** Após a conclusão e uma possível reinicialização do sistema, abra o aplicativo **Ubuntu** no seu menu Iniciar.
+  
+  **3.** A partir daqui, o seu terminal funciona exatamente como um Linux real! Basta rodar os mesmos comandos da seção **Debian / Ubuntu / Mint** acima para instalar as dependências (`build-essential` e `libncurses-dev`), compilar e rodar a engine.
 
 **1. Instale as dependências de acordo com a sua distribuição Linux:**
 
