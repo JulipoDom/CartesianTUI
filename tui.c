@@ -8,6 +8,8 @@ int altura_grafico = 0;
 int offset_y = 1; // Espaço para a borda superior
 int offset_x = 1; // Espaço para a borda lateral
 
+// Inicialização do nscurses, configura a abertura de tela e cores padrão do
+// terminal para interface
 void initTUI() {
   initscr();
   cbreak();
@@ -17,8 +19,6 @@ void initTUI() {
 
   if (has_colors()) {
     start_color();
-    // Essa função mágica permite que o -1 represente as cores nativas do seu
-    // terminal!
     use_default_colors();
 
     // Cores das equações matemáticas (1 a 6)
@@ -30,13 +30,12 @@ void initTUI() {
     init_pair(6, COLOR_WHITE, -1);
 
     // Cores TEMÁTICAS DA UI
-    init_pair(7, COLOR_CYAN,
-              -1); // Cor de Destaque (Accent) para Bordas e Comandos
-    init_pair(8, COLOR_WHITE,
-              -1); // Cor Neutra (Foreground padrão do terminal) para eixos
+    init_pair(7, COLOR_CYAN, -1);
+    init_pair(8, COLOR_WHITE, -1);
   }
 }
 
+// Reseta o a matriz de linhas e colunas mas não desenha isso na tela
 void limparMatrizTela(double x_min, double x_max, double y_min, double y_max) {
   int rows, cols;
   getmaxyx(stdscr, rows, cols);
@@ -51,8 +50,7 @@ void limparMatrizTela(double x_min, double x_max, double y_min, double y_max) {
   int lin_zero = altura_grafico - 1 -
                  (int)((0.0 - y_min) / (y_max - y_min) * altura_grafico);
 
-  // Liga a cor neutra do terminal e deixa a fonte mais fraca/opaca (A_DIM) para
-  // o plano de fundo
+  // Liga a cor neutra do terminal para colocar o tracejado do plano cartesiano
   attron(COLOR_PAIR(8) | A_DIM);
 
   for (int i = 0; i < altura_grafico; i++) {
@@ -95,11 +93,12 @@ void limparMatrizTela(double x_min, double x_max, double y_min, double y_max) {
 
 void closeTUI() { endwin(); }
 
+// Função que pega os rpn_tokens e plota na Matriz sem desenhar
 void plotarNaMatriz(char **tokens, double x_min, double x_max, double y_min,
                     double y_max, int cor_id) {
   double passo_x = (x_max - x_min) / largura_grafico;
   double passo_y = (y_max - y_min) / altura_grafico;
-
+  // Modificação que trata equações bivariadas
   bool tem_igual = false, tem_x = false, tem_y = false;
   for (int i = 0; tokens[i] != NULL; i++) {
     if (strcmp(tokens[i], "=") == 0)
@@ -109,7 +108,7 @@ void plotarNaMatriz(char **tokens, double x_min, double x_max, double y_min,
     if (strcmp(tokens[i], "y") == 0)
       tem_y = true;
   }
-
+  // Atribui a nova cor para função
   attron(COLOR_PAIR(cor_id));
 
   for (int row = 0; row < altura_grafico; row++) {
@@ -117,10 +116,14 @@ void plotarNaMatriz(char **tokens, double x_min, double x_max, double y_min,
       double real_x_base = x_min + (col * passo_x);
       double real_y_base = y_max - (row * passo_y);
 
-      // SUBSAMPLING: Dividimos cada célula do terminal em uma mini-grade de 2x2
+      // Dividimos cada célula do terminal em uma mini-grade de 2x2
+
       int sub_div = 2;
       bool deve_plotar = false;
 
+      // Loop de iteração que analisa celula à celula se o ponto é solução para
+      // equação, caso for ele é plotado na matriz e segue para as proximas
+      // celulas
       for (int sy = 0; sy < sub_div; sy++) {
         for (int sx = 0; sx < sub_div; sx++) {
           double sub_x = real_x_base + (sx * (passo_x / sub_div));
@@ -163,6 +166,10 @@ void plotarNaMatriz(char **tokens, double x_min, double x_max, double y_min,
   }
   attroff(COLOR_PAIR(cor_id));
 }
+// Sim é impressionante que uma função com tantos for loops consiga rodar muitas
+// vezes por segundo
+
+// Desenha alterações e o layout externo da interface
 void desenharTUI() {
   int rows, cols;
   getmaxyx(stdscr, rows, cols);
@@ -170,7 +177,7 @@ void desenharTUI() {
   // Liga a cor de Destaque da UI
   attron(COLOR_PAIR(7));
 
-  box(stdscr, 0, 0); // Borda principal agora tem a cor do tema
+  box(stdscr, 0, 0); // Borda principal
 
   const char *titulo = " CartesianTUI ";
   int padding = (cols - strlen(titulo)) / 2;
@@ -183,7 +190,7 @@ void desenharTUI() {
                      "| [r] Reset | [h] Help | [q] Sair ";
   int padding_cmds = (cols - strlen(cmds)) / 2;
 
-  // Imprime a barra de comandos mantendo a cor de destaque
+  // Imprime a barra de comandos
   mvprintw(rows - 1, padding_cmds > 0 ? padding_cmds : 1, "%s", cmds);
 
   // Desliga a cor de Destaque da UI
@@ -192,6 +199,7 @@ void desenharTUI() {
   refresh();
 }
 
+// Painel de Input para novas equações, a leitura é jogada no parametro buffer
 void lerEquacaoTUI(char *buffer, const char *titulo_janela) {
   int rows, cols;
   getmaxyx(stdscr, rows, cols);
@@ -201,41 +209,100 @@ void lerEquacaoTUI(char *buffer, const char *titulo_janela) {
   int start_x = (cols - w) / 2;
 
   WINDOW *input_win = newwin(h, w, start_y, start_x);
-  box(input_win, 0, 0);
 
-  attron(A_BOLD);
+  wattron(input_win, COLOR_PAIR(5));
+  box(input_win, 0, 0);
+  wattroff(input_win, COLOR_PAIR(5));
+
+  wattron(input_win, COLOR_PAIR(5) | A_BOLD);
   mvwprintw(input_win, 0, 2, " %s ", titulo_janela);
-  attroff(A_BOLD);
+  wattroff(input_win, COLOR_PAIR(5) | A_BOLD);
 
   mvwprintw(input_win, 2, 2, "Digite: ");
-  wrefresh(input_win);
 
-  // Reativa o eco para o usuário conseguir ver o que está digitando na janela
-  echo();
+  noecho();
+  keypad(input_win, TRUE);
   curs_set(1);
 
-  // Posiciona o cursor na caixa de texto e lê a string informada
-  mvwgetnstr(input_win, 2, 10, buffer, TAM_MAX_EQ - 1);
+  int str_len = 0;
+  int cursor_pos = 0;
+  int offset = 0;
+  int max_w = 37;
 
-  // Desativa o eco e esconde o cursor novamente para manter o padrão do
-  // jogo/tui
-  noecho();
+  buffer[0] = '\0';
+
+  while (1) {
+    // 1. Limpa e desenha apenas a janela visível da string
+    mvwprintw(input_win, 2, 10, "%-*.*s", max_w, max_w, &buffer[offset]);
+
+    // 2. Coloca o cursor piscando na posição correta na tela
+    wmove(input_win, 2, 10 + (cursor_pos - offset));
+    wrefresh(input_win);
+
+    // 3. Aguarda o usuário digitar
+    int ch = wgetch(input_win);
+
+    if (ch == '\n' || ch == '\r') {
+      break;
+    } else if (ch == KEY_LEFT) {
+      if (cursor_pos > 0) {
+        cursor_pos--;
+        // Se o cursor for para trás da parte visível, arrasta o scroll para a
+        // esquerda
+        if (cursor_pos < offset) {
+          offset = cursor_pos;
+        }
+      }
+    } else if (ch == KEY_RIGHT) {
+      if (cursor_pos < str_len) {
+        cursor_pos++;
+        // Se o cursor ultrapassar a margem direita, empurra o scroll
+        if (cursor_pos >= offset + max_w) {
+          offset = cursor_pos - max_w + 1;
+        }
+      }
+    } else if (ch == KEY_BACKSPACE || ch == 127 || ch == '\b') {
+      if (cursor_pos > 0) {
+        // Puxa tudo que está à direita do cursor uma casa para a esquerda
+        // (apagando o caractere)
+        memmove(&buffer[cursor_pos - 1], &buffer[cursor_pos],
+                str_len - cursor_pos + 1);
+        cursor_pos--;
+        str_len--;
+
+        // Ajusta o scroll caso o cursor volte demais
+        if (cursor_pos < offset) {
+          offset = cursor_pos;
+        }
+      }
+    } else if (str_len < TAM_MAX_EQ - 1 && ch >= 32 && ch <= 126) {
+      // Abre espaço empurrando tudo que está na frente do cursor uma casa para
+      // a direita
+      memmove(&buffer[cursor_pos + 1], &buffer[cursor_pos],
+              str_len - cursor_pos + 1);
+
+      // Insere o novo caractere na posição exata do cursor
+      buffer[cursor_pos] = ch;
+      cursor_pos++;
+      str_len++;
+
+      // Atualiza o scroll se a digitação passar do limite visível
+      if (cursor_pos >= offset + max_w) {
+        offset = cursor_pos - max_w + 1;
+      }
+    }
+  }
+
   curs_set(0);
-
-  // --- NOVA VERIFICAÇÃO ---
-  // Se o buffer estiver vazio (usuário só apertou Enter sem digitar nada),
-  // podemos opcionalmente colocar uma string vazia ou sinalizar para ignorar.
-  // Como o seu main checa se a equação é válida, se estiver vazia ela não será
-  // plotada.
-
   delwin(input_win);
   clear();
   refresh();
 }
 
+// Mostra o painel de ajuda na interface
 void mostrarHelpTUI(void) {
   // Define o tamanho da janela modal
-  int altura = 18;
+  int altura = 19;
   int largura = 60;
   int starty = (LINES - altura) / 2;
   int startx = (COLS - largura) / 2;
@@ -245,7 +312,7 @@ void mostrarHelpTUI(void) {
   keypad(win_help, TRUE);
 
   int pagina_atual = 1;
-  int total_paginas = 2;
+  int total_paginas = 4;
   int ch;
 
   // Loop da janela de ajuda
@@ -254,10 +321,11 @@ void mostrarHelpTUI(void) {
     box(win_help, 0, 0); // Desenha a borda
 
     if (pagina_atual == 1) {
-      mvwprintw(win_help, 1, (largura - 19) / 2, "=== AJUDA (Pag 1/2) ===");
+      mvwprintw(win_help, 1, (largura - 23) / 2, "=== AJUDA (Pag 1/4) ===");
 
       int linha = 3;
       mvwprintw(win_help, linha++, 2, "Navegacao e Controle:");
+      ;
       mvwprintw(win_help, linha++, 2, "  Setas      : Move o grafico (Pan)");
       mvwprintw(win_help, linha++, 2, "  + / -      : Zoom in / Zoom out");
       mvwprintw(win_help, linha++, 2, "  R          : Reseta a visualizacao");
@@ -275,8 +343,55 @@ void mostrarHelpTUI(void) {
                 "  H          : Mostra esta tela de ajuda");
       mvwprintw(win_help, linha++, 2, "  Q / ESC    : Sair do programa");
     } else if (pagina_atual == 2) {
-      mvwprintw(win_help, 1, (largura - 33) / 2,
-                "=== SINTAXE DE EQUACOES (Pag 2/2) ===");
+      mvwprintw(win_help, 1, (largura - 25) / 2, "=== FUNCOES (Pag 2/4) ===");
+
+      int linha = 3;
+      mvwprintw(win_help, linha++, 2, "Funcoes Matematicas Suportadas:");
+      linha++;
+      mvwprintw(win_help, linha++, 2, "Operadores: +, -, *, /, ^ (potencia)");
+      linha++;
+      mvwprintw(win_help, linha++, 2, "Funcoes Diversas : sqrt(), log(), ln()");
+      mvwprintw(win_help, linha++, 2, "Trig. Basicas    : sin(), cos(), tan()");
+      mvwprintw(win_help, linha++, 2, "                   sec(), csc(), cot()");
+      mvwprintw(win_help, linha++, 2,
+                "Trig. Inversas   : arcsin(), arccos(), arctan(),");
+      mvwprintw(win_help, linha++, 2,
+                "                   arcsec(), arccsc(), arccot()");
+      mvwprintw(win_help, linha++, 2,
+                "Trig. Hiperbol.  : sinh(), cosh(), tanh()");
+
+      mvwprintw(win_help, linha++, 2,
+                "                   sech(), csch(), coth()");
+
+      mvwprintw(win_help, linha++, 2, "Constantes       : pi, e");
+    } else if (pagina_atual == 3) {
+      mvwprintw(win_help, 1, (largura - 34) / 2,
+                "=== MODO DE OPERACAO (Pag 3/4) ===");
+
+      int linha = 3;
+      mvwprintw(win_help, linha++, 2, "Valores Implicitos em Equação:");
+      mvwprintw(win_help, linha++, 2, "1. Multiplicação");
+      mvwprintw(win_help, linha++, 2,
+                "   Ex: 12x -> 12 * x; piexsin(x) -> pi * e * x * sin(x)");
+      mvwprintw(win_help, linha++, 2, "2. Negatividade ( '-' Unario )");
+      mvwprintw(win_help, linha++, 2,
+                "   Ex: -(x - 1) -> -x + 1; -(-(-(-1))) -> 1");
+      mvwprintw(win_help, linha++, 2,
+                "Ordem de Operacoes (Maior > Menor prioridade):");
+      mvwprintw(win_help, linha++, 2, "  1. ( )   Agrupamentos e Parenteses");
+      mvwprintw(win_help, linha++, 2,
+                "  2. f(x)  Funcoes (sin, log, sqrt, etc)");
+      mvwprintw(win_help, linha++, 2,
+                "  3.  -    Sinal Negativo Unario (Ex: -x)");
+      mvwprintw(win_help, linha++, 2, "  4.  ^    Potenciacao");
+      mvwprintw(win_help, linha++, 2,
+                "  5. * /   Multiplicacao (inclui implícita) e Divisao");
+      mvwprintw(win_help, linha++, 2, "  6. + -   Adicao e Subtracao");
+      mvwprintw(win_help, linha++, 2,
+                "  7.  =    Igualdade (Equacoes Implicitas)");
+    } else if (pagina_atual == 4) {
+      mvwprintw(win_help, 1, (largura - 37) / 2,
+                "=== SINTAXE DE EQUACOES (Pag 4/4) ===");
 
       int linha = 3;
       mvwprintw(win_help, linha++, 2, "1. Funcoes de X (y = f(x))");

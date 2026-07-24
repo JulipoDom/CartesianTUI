@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+// implementação generica de stack de strings
+
 typedef struct Stack {
   int top;
   int capacity;

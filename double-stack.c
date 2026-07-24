@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// implementação generica de stack de double
+
 typedef struct DoubleStack {
   double *items;
   int capacity;

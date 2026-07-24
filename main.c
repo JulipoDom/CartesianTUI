@@ -21,8 +21,12 @@ void moverPlano(double *min, double *max, double direcao) {
   *max += deslocamento;
 }
 
+// RPN = Reverse Polish Notation (Notação Polonesa Inversa)
+// Serve para gerar Stacks conservando Ordem de Operação
+
 int main() {
-  setlocale(LC_ALL, ""); // Garante o suporte a UTF-8 para os pontos '•'
+  setlocale(LC_ALL, "");
+
   char historico_eq[MAX_EQUACOES][TAM_MAX_EQ];
   char ***rpn_cache = malloc(MAX_EQUACOES * sizeof(char **));
   int total_eqs = 0;
@@ -34,8 +38,6 @@ int main() {
   int rows, cols;
   getmaxyx(stdscr, rows, cols);
 
-  // 1. Criamos os limites REAIS (que aparecem na tela) e os ALVOS (onde a
-  // câmera quer chegar)
   double x_min = -((cols - 2) / 4.0), x_max = ((cols - 2) / 4.0);
   double y_min = -((rows - 2) / 2.0), y_max = ((rows - 2) / 2.0);
 
@@ -50,33 +52,25 @@ int main() {
   limparMatrizTela(x_min, x_max, y_min, y_max);
 
   while (rodando) {
-    // Flag para saber se precisamos redesenhar este quadro
     bool redesenhar = false;
-
-    // 1. Se estivermos no modo suave e a câmera ainda estiver se movendo até o
-    // alvo:
+    // Aplica Suavização com velocidade de 20% por iteração
     if (modo_suave && (fabs(x_max_alvo - x_max) > 0.0001 ||
                        fabs(y_max_alvo - y_max) > 0.0001)) {
-      // Fator de suavização ajustado para 60 FPS (valores menores deixam a
-      // inércia mais suave)
       double suavizacao = 0.2;
       x_min += (x_min_alvo - x_min) * suavizacao;
       x_max += (x_max_alvo - x_max) * suavizacao;
       y_min += (y_min_alvo - y_min) * suavizacao;
       y_max += (y_max_alvo - y_max) * suavizacao;
       redesenhar = true;
+      // Caso o modo suave esteja desligado, teleporta para o ponto
     } else if (!modo_suave && (x_min != x_min_alvo || x_max != x_max_alvo ||
                                y_min != y_min_alvo || y_max != y_max_alvo)) {
-      // Se não for suave mas mudou o alvo, atualiza instantaneamente
       x_min = x_min_alvo;
       x_max = x_max_alvo;
       y_min = y_min_alvo;
       y_max = y_max_alvo;
       redesenhar = true;
     }
-
-    // 2. Leitura de Input Não-Bloqueante (roda instantaneamente sem travar a
-    // CPU)
     int ch = getch();
     if (ch != ERR) {
       redesenhar = true; // Se o usuário apertou algo, redesenha imediatamente
@@ -93,13 +87,13 @@ int main() {
           }
         }
       } else {
+        // Funções da interface
         switch (ch) {
         case 'q':
           rodando = false;
           break;
         case 'h':
           // Pausa o nodelay momentaneamente para o menu de help aceitar input
-          // normal
           nodelay(stdscr, FALSE);
           mostrarHelpTUI();
           nodelay(stdscr, TRUE);
@@ -113,9 +107,10 @@ int main() {
             y_max_alvo = y_max;
           }
           break;
+        // Criar novas equações e seus tokens
         case 'n':
         case 's':
-          nodelay(stdscr, FALSE); // Pausa para digitar na caixa de input
+          nodelay(stdscr, FALSE);
           if (ch == 'n') {
             for (int i = 0; i < total_eqs; i++)
               liberarTokens(rpn_cache[i]);
@@ -138,7 +133,7 @@ int main() {
           nodelay(stdscr, TRUE); // Retoma o fluxo fluido
           break;
 
-        // Comandos de Zoom e Movimento alteram os ALVOS
+        // Comandos de Zoom e Movimento alteram os alvos
         case 'x': {
           double cx = (x_max_alvo + x_min_alvo) / 2,
                  rx = (x_max_alvo - x_min_alvo) / 4;
@@ -224,7 +219,7 @@ int main() {
       }
     }
 
-    // 3. Renderização inteligente: Só redesenha a tela se a câmera estiver se
+    // Só redesenha a tela se a câmera estiver se
     // movendo ou se houve input
     if (redesenhar || (modo_suave && fabs(x_max_alvo - x_max) > 0.0001)) {
       erase();
@@ -246,11 +241,12 @@ int main() {
       desenharTUI();
     }
 
-    // 4. LIMITADOR DE FRAME (Vsync por software):
-    // Dorme ~16 milissegundos por quadro para travar exatamente em ~60 FPS e
-    // não fritar a CPU com 100% de uso.
+    // Dorme por 16 milissegundos por quadro para travar exatamente em 60 FPS e
+    // não fritar tanto a CPU.
     usleep(16000);
   }
+
+  // Caso saia do While ele termina o programa;
 
   closeTUI();
   printf("\033[?1003l\n");

@@ -12,7 +12,7 @@ const char *palavras_conhecidas[] = {
     "sin",    "arcsin", "sinh",   "cos",  "arccos", "cosh",   "tan",  "arctan",
     "tanh",   "cot",    "arccot", "coth", "sec",    "arcsec", "sech", "csc",
     "arccsc", "csch",   "log",    "ln",   "sqrt",   "pi",     "e"};
-const int num_palavras = 22;
+const int num_palavras = 23;
 
 // Verifica se o texto começa com uma palavra do dicionário.
 // Retorna o tamanho da palavra encontrada ou 0.
@@ -35,7 +35,8 @@ char proximoCaractereReal(const char *expr, int indice_atual) {
     k++;
   return expr[k];
 }
-
+// faz a leitura da string de equação inicial e limpa ela transformando em
+// tokens
 char **inputReader(const char *expression) {
   int capacity = 100;
   char **token_array = (char **)malloc(capacity * sizeof(char *));
@@ -51,7 +52,7 @@ char **inputReader(const char *expression) {
 
     char c = expression[j];
 
-    // 1. Ignora espaços
+    // Ignora espaços
     if (c == ' ') {
       j++;
       continue;
@@ -59,7 +60,7 @@ char **inputReader(const char *expression) {
 
     bool e_fator = false; // Flag para saber se precisamos injetar '*' depois
 
-    // 2. Lendo Números (Inteiros e Decimais)
+    // Lê numeros
     if (isdigit(c) || c == '.') {
       char buffer[256];
       int buf_idx = 0;
@@ -69,23 +70,23 @@ char **inputReader(const char *expression) {
       buffer[buf_idx] = '\0';
       token_array[token_count++] = strdup(buffer);
 
-      e_fator = true; // Números podem ser multiplicados implicitamente
+      e_fator = true;
     }
 
-    // 3. Lendo Letras (O Greedy Matching entra aqui!)
+    // Lê letras
     else if (isalpha(c)) {
       int tam = tamanhoPalavraConhecida(&expression[j]);
 
       if (tam > 0) {
-        // Achou uma palavra do dicionário (ex: "sin", "pi")
+        // Se achou  uma palavra do dicionário
         char buffer[256];
         strncpy(buffer, &expression[j], tam);
         buffer[tam] = '\0';
         token_array[token_count++] = strdup(buffer);
 
-        j += tam; // Dá o salto no índice!
+        j += tam; // Pula o tamanho da função no indice
 
-        // Funções como "sin" não multiplicam o que vem na frente,
+        // Funções como "sin" não multiplicam o que vem na frente
         // mas constantes como "pi" e "e" sim (ex: "pi x" -> "pi * x")
         if (strcmp(buffer, "pi") == 0 || strcmp(buffer, "e") == 0) {
           e_fator = true;
@@ -95,13 +96,13 @@ char **inputReader(const char *expression) {
         char op_str[2] = {c, '\0'};
         token_array[token_count++] = strdup(op_str);
 
-        j++; // Avança apenas 1 casa
+        j++;
         e_fator =
             true; // Variáveis podem ser multiplicadas (ex: "xy" -> "x * y")
       }
     }
 
-    // 4. Lendo Operadores e Parênteses
+    // Lê Operadores e Parênteses
     else {
       if (c == '-') {
         bool is_unary = (token_count == 0);
@@ -123,10 +124,10 @@ char **inputReader(const char *expression) {
       if (c == ')' || c == ']')
         e_fator = true; // Parêntese fechando ativa a multiplicação
 
-      j++; // Avança 1 caractere para o operador
+      j++;
     }
 
-    // 5. Injeção da Multiplicação Implícita
+    // Injeção da Multiplicação Implícita
     if (e_fator) {
       char proximo = proximoCaractereReal(expression, j);
       // Se o próximo for letra, abrir parêntese, ou um número avulso
@@ -145,14 +146,14 @@ void liberarTokens(char **tokens) {
   if (tokens == NULL)
     return;
 
-  // 1. Libera cada string (token) individualmente gerada pelo strdup
+  // Libera cada string (token) individualmente gerada pelo strdup
   int i = 0;
   while (tokens[i] != NULL) {
     free(tokens[i]);
     i++;
   }
 
-  // 2. Libera o array principal (o contêiner) gerado pelo malloc
+  // Libera o array principal (o contêiner) gerado pelo malloc
   free(tokens);
 }
 
@@ -174,9 +175,9 @@ int getPrecedencia(const char *op) {
 }
 
 bool isOperador(const char *token) {
-  // Adicionamos o '=' aqui na string
   return strchr("+-*/^~=", token[0]) != NULL && strlen(token) == 1;
 }
+
 // Retorna true se o operador é associativo à direita
 bool isAssociativoDireita(const char *op) {
   if (strcmp(op, "^") == 0 || strcmp(op, "~") == 0)
@@ -196,7 +197,7 @@ bool isFuncao(const char *token) {
 }
 
 char **shuntingYard(char **tokens) {
-  // 1. Inicializa a Pilha de Operações e a Fila de Saída (RPN)
+  // Inicializa a Pilha de Operações e a Fila de Saída (RPN)
   StringStack opStack;
   initStack(&opStack, 100);
 
@@ -204,7 +205,7 @@ char **shuntingYard(char **tokens) {
   char **saida = (char **)malloc(capacidade_saida * sizeof(char *));
   int count = 0;
 
-  // 2. Loop principal: avalia token por token
+  // Loop principal: avalia token por token
   for (int i = 0; tokens[i] != NULL; i++) {
     char *token = tokens[i];
 
@@ -214,8 +215,7 @@ char **shuntingYard(char **tokens) {
       saida = (char **)realloc(saida, capacidade_saida * sizeof(char *));
     }
 
-    // REGRA A: É um número, variável (x, y) ou constante (pi, e)? Vai direto
-    // pra saída.
+    // Número, variável (x, y) ou constante (pi, e) vão para saida
     if (isdigit(token[0]) || token[0] == '.' ||
         (isalpha(token[0]) && strlen(token) == 1) || strcmp(token, "pi") == 0 ||
         strcmp(token, "e") == 0) {
@@ -223,17 +223,17 @@ char **shuntingYard(char **tokens) {
       saida[count++] = strdup(token);
     }
 
-    // REGRA B: É uma função (sin, cos, tan)? Vai pra pilha.
+    // Função (sin, cos, tan) vai pra pilha.
     else if (isFuncao(token)) {
       pushStack(&opStack, token);
     }
 
-    // REGRA C: Abre parênteses/colchetes? Vai pra pilha.
+    // Abre parênteses/colchetes vai pra pilha.
     else if (strcmp(token, "(") == 0 || strcmp(token, "[") == 0) {
       pushStack(&opStack, token);
     }
 
-    // REGRA D: Fecha parênteses/colchetes?
+    // Fecha parênteses/colchetes
     else if (strcmp(token, ")") == 0 || strcmp(token, "]") == 0) {
       char abre_paren = (token[0] == ')') ? '(' : '[';
 
@@ -255,7 +255,7 @@ char **shuntingYard(char **tokens) {
       }
     }
 
-    // REGRA E: É um operador (+, -, *, /, ^, ~)
+    // Operador (+, -, *, /, ^, ~)
     else if (isOperador(token)) {
       while (!isEmpty(&opStack)) {
         char *topo = peek(&opStack);
@@ -268,7 +268,7 @@ char **shuntingYard(char **tokens) {
         int prec_topo = getPrecedencia(topo);
 
         // Desempilha se o operador no topo tiver precedência maior,
-        // OU se tiver precedência igual mas for associativo à esquerda.
+        // ou se tiver precedência igual mas for associativo à esquerda.
         if (prec_topo > prec_token ||
             (prec_topo == prec_token && !isAssociativoDireita(token))) {
           saida[count++] = popStack(&opStack);
@@ -295,7 +295,7 @@ char **shuntingYard(char **tokens) {
     saida[count++] = restante;
   }
 
-  // Adiciona a "parede" nula no final do array de saída
+  // Adiciona a NULL no final do array de saída para sinalizar o final
   saida[count] = NULL;
 
   // Limpa a estrutura da pilha (apenas os ponteiros internos, não as strings em
@@ -307,22 +307,22 @@ char **shuntingYard(char **tokens) {
 
 double evalRPN(char **rpnTokens, double x, double y) {
   DoubleStack stack;
-  initDoubleStack(&stack, 50); // Tamanho inicial razoável
+  initDoubleStack(&stack, 50);
   int i = 0;
   while (rpnTokens[i] != NULL) {
     char *token = rpnTokens[i];
-
+    // Variaveis
     if (strcmp(token, "x") == 0) {
       pushDoubleStack(&stack, x);
     } else if (strcmp(token, "y") == 0) {
       pushDoubleStack(&stack, y);
-    } // 2. Constantes (exemplo: pi)
+    } // Constantes
     else if (strcmp(token, "pi") == 0) {
       pushDoubleStack(&stack, M_PI);
     } else if (strcmp(token, "e") == 0) {
       pushDoubleStack(&stack, M_E);
     }
-    // 3. Operadores Binários (+, -, *, /, ^)
+    // Operadores Binários (+, -, *, /, ^, =)
     else if (strlen(token) == 1 && strchr("+-*/^=", token[0]) != NULL) {
       double b = popDoubleStack(&stack); // Lado direito
       double a = popDoubleStack(&stack); // Lado esquerdo
@@ -338,7 +338,7 @@ double evalRPN(char **rpnTokens, double x, double y) {
       else if (token[0] == '^')
         pushDoubleStack(&stack, pow(a, b));
     }
-    // 4. Funções Unárias (sin, cos, sqrt, etc)
+    // Funções Unárias (sin, cos, sqrt, etc)
     else if (isFuncao(token) || strcmp(token, "~") == 0) {
       double a = popDoubleStack(&stack);
 
