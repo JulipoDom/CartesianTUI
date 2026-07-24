@@ -98,8 +98,7 @@ _(A flag `-lncurses` vincula a biblioteca visual e a flag `-lm` vincula as bibli
 
 ```bash
 ./cartesian
-
+```
 ## 📄 Licença
 
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
-```
