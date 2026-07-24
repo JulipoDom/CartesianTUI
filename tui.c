@@ -1,5 +1,6 @@
 #include "tui.h"
 #include "engine-core.h"
+#include <math.h>
 #include <ncurses.h>
 #include <string.h>
 
@@ -132,6 +133,18 @@ void plotarNaMatriz(char **tokens, double x_min, double x_max, double y_min,
           double v_atual = evalRPN(tokens, sub_x, sub_y);
           double v_dir = evalRPN(tokens, sub_x + (passo_x / sub_div), sub_y);
           double v_baixo = evalRPN(tokens, sub_x, sub_y - (passo_y / sub_div));
+
+          if (!tem_igual) {
+            double limite_assintota =
+                (y_max - y_min) * 0.8; // Limite de 80% da altura do gráfico
+
+            // Se a diferença absoluta entre os pontos vizinhos for maior que o
+            // limite, ignoramos o cruzamento
+            if (fabs(v_dir - v_atual) > limite_assintota ||
+                fabs(v_baixo - v_atual) > limite_assintota) {
+              continue; // Pula para o próximo loop (sx, sy) sem desenhar
+            }
+          }
 
           if (!tem_igual) {
             if (tem_y && !tem_x) {
